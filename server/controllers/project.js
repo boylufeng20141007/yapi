@@ -12,9 +12,9 @@ const userModel = require('../models/user.js');
 const logModel = require('../models/log.js');
 const followModel = require('../models/follow.js');
 const tokenModel = require('../models/token.js');
-const url = require('url');
-
+const {getToken} = require('../utils/token')
 const sha = require('sha.js');
+const axios = require('axios').default;
 
 class projectController extends baseController {
   constructor(ctx) {
@@ -93,7 +93,8 @@ class projectController extends baseController {
         '*id': id
       },
       get: {
-        '*id': id
+        'id': id,
+        'project_id': id
       },
       list: {
         '*group_id': group_id
@@ -517,7 +518,8 @@ class projectController extends baseController {
 
   async get(ctx) {
     let params = ctx.params;
-    let result = await this.Model.getBaseInfo(params.id);
+    let projectId= params.id || params.project_id; // 通过 token 访问
+    let result = await this.Model.getBaseInfo(projectId);
 
     if (!result) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '不存在的项目'));
@@ -1004,10 +1006,13 @@ class projectController extends baseController {
           .update(passsalt)
           .digest('hex')
           .substr(0, 20);
+
         await this.tokenModel.save({ project_id, token });
       } else {
         token = data.token;
       }
+
+      token = getToken(token, this.getUid())
 
       ctx.body = yapi.commons.resReturn(token);
     } catch (err) {
@@ -1037,6 +1042,7 @@ class projectController extends baseController {
           .digest('hex')
           .substr(0, 20);
         result = await this.tokenModel.up(project_id, token);
+        token = getToken(token);
         result.token = token;
       } else {
         ctx.body = yapi.commons.resReturn(null, 402, '没有查到token信息');
@@ -1113,15 +1119,17 @@ class projectController extends baseController {
     return (ctx.body = yapi.commons.resReturn(queryList, 0, 'ok'));
   }
 
-  // 输入 swagger url  的时候node端请求数据
+  // 输入 swagger url 的时候 node 端请求数据
   async swaggerUrl(ctx) {
     try {
-      let ops = url.parse(ctx.request.query.url);
-      let result = await yapi.commons.createWebAPIRequest(ops);
-
-      ctx.body = yapi.commons.resReturn(result);
+      const { url } = ctx.request.query;
+      const { data } = await axios.get(url);
+      if (data == null || typeof data !== 'object') {
+        throw new Error('返回数据格式不是 JSON');
+      }
+      ctx.body = yapi.commons.resReturn(data);
     } catch (err) {
-      ctx.body = yapi.commons.resReturn(null, 402, err.message);
+      ctx.body = yapi.commons.resReturn(null, 402, String(err));
     }
   }
 }

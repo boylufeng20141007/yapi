@@ -18,6 +18,7 @@ const renderToHtml = require('../utils/reportHtml');
 const axios = require('axios');
 const HanldeImportData = require('../../common/HandleImportData');
 const _ = require('underscore');
+const createContex = require('../../common/createContext')
 
 /**
  * {
@@ -76,18 +77,48 @@ class openController extends baseController {
     let content = ctx.params.json;
     let project_id = ctx.params.project_id;
     let dataSync = ctx.params.merge;
+
+    let warnMessage = ''
+
+    /**
+     * 因为以前接口文档写错了，做下兼容
+     */
+    try{
+      if(!dataSync &&ctx.params.dataSync){
+        warnMessage = 'importData Api 已废弃 dataSync 传参，请联系管理员将 dataSync 改为 merge.'
+        dataSync = ctx.params.dataSync
+      }
+    }catch(e){}
+
     let token = ctx.params.token;
     if (!type || !importDataModule[type]) {
       return (ctx.body = yapi.commons.resReturn(null, 40022, '不存在的导入方式'));
     }
 
-    if (!content) {
-      return (ctx.body = yapi.commons.resReturn(null, 40022, 'json 不能为空'));
+    if (!content && !ctx.params.url) {
+      return (ctx.body = yapi.commons.resReturn(null, 40022, 'json 或者 url 参数，不能都为空'));
     }
     try {
+      let request = require("request");// let Promise = require('Promise');
+      let syncGet = function (url){
+          return new Promise(function(resolve, reject){
+              request.get({url : url}, function(error, response, body){
+                  if(error){
+                      reject(error);
+                  }else{
+                      resolve(body);
+                  }
+              });
+          });
+      } 
+      if(ctx.params.url){
+        content = await syncGet(ctx.params.url);
+      }else if(content.indexOf('http://') === 0 || content.indexOf('https://') === 0){
+        content = await syncGet(content);
+      }
       content = JSON.parse(content);
     } catch (e) {
-      return (ctx.body = yapi.commons.resReturn(null, 40022, 'json 格式有误'));
+      return (ctx.body = yapi.commons.resReturn(null, 40022, 'json 格式有误:' + e));
     }
 
     let menuList = await this.interfaceCatModel.list(project_id);
@@ -118,7 +149,7 @@ class openController extends baseController {
     if (errorMessage.length > 0) {
       return (ctx.body = yapi.commons.resReturn(null, 404, errorMessage.join('\n')));
     }
-    ctx.body = yapi.commons.resReturn(null, 0, successMessage);
+    ctx.body = yapi.commons.resReturn(null, 0, successMessage + warnMessage);
   }
 
   async projectInterfaceData(ctx) {
@@ -233,8 +264,8 @@ class openController extends baseController {
     };
 
     if (ctx.params.email === true && reportsResult.message.failedNum !== 0) {
-      let autoTestUrl = `http://${
-        ctx.request.host
+      let autoTestUrl = `${
+        ctx.request.origin
       }/api/open/run_auto_test?id=${id}&token=${token}&mode=${ctx.params.mode}`;
       yapi.commons.sendNotice(projectId, {
         title: `YApi自动化测试报告`,
@@ -277,7 +308,12 @@ class openController extends baseController {
       validRes: []
     };
     try {
-      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script);
+      options.taskId = this.getUid();
+      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,createContex(
+        this.getUid(),
+        interfaceData.project_id,
+        interfaceData.interface_id
+      ));
       let res = data.res;
 
       result = Object.assign(result, {
@@ -329,16 +365,14 @@ class openController extends baseController {
   }
 
   async handleScriptTest(interfaceData, response, validRes, requestParams) {
-    if (interfaceData.enable_script !== true) {
-      return null;
-    }
+    
     try {
       let test = await yapi.commons.runCaseScript({
         response: response,
         records: this.records,
         script: interfaceData.test_script,
         params: requestParams
-      });
+      }, interfaceData.col_id, interfaceData.interface_id, this.getUid());
       if (test.errcode !== 0) {
         test.data.logs.forEach(item => {
           validRes.push({

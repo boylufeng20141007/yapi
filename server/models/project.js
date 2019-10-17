@@ -6,6 +6,26 @@ class projectModel extends baseModel {
     return 'project';
   }
 
+  constructor(){
+    super()
+    this.handleEnvNullData = this.handleEnvNullData.bind(this)
+  }
+
+  getAuthList(uid){
+    return this.model.find({
+      $or: [{
+        'members.uid': uid,
+        project_type: 'private'
+      }, {
+        uid,
+        project_type: 'private'
+      }, {
+        project_type: 'public'
+      }]
+    }).select('group_id')
+    .exec();
+  }
+
   getSchema() {
     return {
       uid: { type: Number, required: true },
@@ -24,7 +44,10 @@ class projectModel extends baseModel {
           email_notice: { type: Boolean, default: true }
         }
       ],
-      env: [{ name: String, domain: String, header: Array, global: Array }],
+      env: [{ name: String, domain: String, header: Array, global: [{
+        name: String,
+        value: String
+      }] }],
       icon: String,
       color: String,
       add_time: Number,
@@ -58,12 +81,44 @@ class projectModel extends baseModel {
     return m.save();
   }
 
+  handleEnvNullData(data){
+    data = data.toObject();
+    data.toObject = ()=> data;
+    let isFix = false;
+    if(Array.isArray(data.env)){
+      data.env = data.env.map(item=>{
+        item.global = item.global.filter(g=>{
+          if(!g || typeof g !== 'object'){
+            isFix = true;
+            return false;
+          }
+          return true;
+        })
+        return item;
+      })
+    }
+    
+    if(isFix){
+      this.model.update(
+        {
+          _id: data._id
+
+        },
+        {
+          $set: { env: data.env }
+        },
+        { runValidators: true }
+      );
+    }
+    return data;
+  }
+
   get(id) {
     return this.model
       .findOne({
         _id: id
       })
-      .exec();
+      .exec().then(this.handleEnvNullData)
   }
 
   getByEnv(id) {
@@ -72,11 +127,11 @@ class projectModel extends baseModel {
         _id: id
       })
       .select('env')
-      .exec();
+      .exec().then(this.handleEnvNullData);
   }
 
   getProjectWithAuth(group_id, uid) {
-    return this.model.count({
+    return this.model.countDocuments({
       group_id: group_id,
       'members.uid': uid
     });
@@ -91,7 +146,7 @@ class projectModel extends baseModel {
         _id: id
       })
       .select(select)
-      .exec();
+      .exec().then(this.handleEnvNullData);
   }
 
   getByDomain(domain) {
@@ -99,18 +154,18 @@ class projectModel extends baseModel {
       .find({
         prd_host: domain
       })
-      .exec();
+      .exec().then(this.handleEnvNullData);
   }
 
   checkNameRepeat(name, groupid) {
-    return this.model.count({
+    return this.model.countDocuments({
       name: name,
       group_id: groupid
     });
   }
 
   checkDomainRepeat(domain, basepath) {
-    return this.model.count({
+    return this.model.countDocuments({
       prd_host: domain,
       basepath: basepath
     });
@@ -129,12 +184,12 @@ class projectModel extends baseModel {
 
   // 获取项目数量统计
   getProjectListCount() {
-    return this.model.count();
+    return this.model.countDocuments();
   }
 
   countWithPublic(group_id) {
     let params = { group_id: group_id, project_type: 'public' };
-    return this.model.count(params);
+    return this.model.countDocuments(params);
   }
 
   listWithPaging(group_id, page, limit) {
@@ -151,13 +206,13 @@ class projectModel extends baseModel {
   }
 
   listCount(group_id) {
-    return this.model.count({
+    return this.model.countDocuments({
       group_id: group_id
     });
   }
 
   countByGroupId(group_id) {
-    return this.model.count({
+    return this.model.countDocuments({
       group_id: group_id
     });
   }
@@ -209,7 +264,7 @@ class projectModel extends baseModel {
   }
 
   checkMemberRepeat(id, uid) {
-    return this.model.count({
+    return this.model.countDocuments({
       _id: id,
       'members.uid': uid
     });

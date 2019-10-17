@@ -12,17 +12,17 @@ import mockEditor from 'client/components/AceEditor/mockEditor';
 import AceEditor from 'client/components/AceEditor/AceEditor';
 import axios from 'axios';
 import { MOCK_SOURCE } from '../../../../constants/variable.js';
+import Editor from 'common/tui-editor/dist/tui-editor-Editor-all.min.js';
 const jSchema = require('json-schema-editor-visual');
 const ResBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const ReqBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const TabPane = Tabs.TabPane;
 
-require('codemirror/lib/codemirror.css'); // codemirror
-require('tui-editor/dist/tui-editor.css'); // editor ui
-require('tui-editor/dist/tui-editor-contents.css'); // editor content
-require('highlight.js/styles/github.css'); // code block highlight
+
+require('common/tui-editor/dist/tui-editor.min.css'); // editor ui
+require('common/tui-editor/dist/tui-editor-contents.min.css'); // editor content
 require('./editor.css');
-var Editor = require('tui-editor');
+
 
 function checkIsJsonSchema(json) {
   try {
@@ -1211,7 +1211,7 @@ class InterfaceEditForm extends Component {
                         <span
                           className="href"
                           onClick={() =>
-                            window.open('https://yapi.ymfe.org/documents/mock.html', '_blank')
+                            window.open('https://hellosean1025.github.io/yapi/documents/mock.html', '_blank')
                           }
                         >
                           查看文档
@@ -1291,8 +1291,8 @@ class InterfaceEditForm extends Component {
               {...formItemLayout}
               label={
                 <span>
-                  邮件通知&nbsp;
-                  <Tooltip title={'开启邮件通知，可在 项目设置 里修改'}>
+                  消息通知&nbsp;
+                  <Tooltip title={'开启消息通知，可在 项目设置 里修改'}>
                     <Icon type="question-circle-o" style={{ width: '10px' }} />
                   </Tooltip>
                 </span>

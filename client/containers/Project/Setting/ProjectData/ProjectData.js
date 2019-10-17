@@ -70,10 +70,10 @@ class ProjectData extends Component {
     this.state = {
       selectCatid: '',
       menuList: [],
-      curImportType: null,
+      curImportType: 'swagger',
       curExportType: null,
       showLoading: false,
-      dataSync: 'good',
+      dataSync: 'merge',
       exportContent: 'all',
       isSwaggerUrl: false,
       swaggerUrl: '',
@@ -325,7 +325,7 @@ class ProjectData extends Component {
                   <a
                     target="_blank"
                     rel="noopener noreferrer"
-                    href="https://yapi.ymfe.org/documents/data.html"
+                    href="https://hellosean1025.github.io/yapi/documents/data.html"
                   >
                     <Tooltip title="点击查看文档">
                       <Icon type="question-circle-o" />
@@ -336,6 +336,7 @@ class ProjectData extends Component {
               <div className="dataImportTile">
                 <Select
                   placeholder="请选择导入数据的方式"
+                  value={this.state.curImportType}
                   onChange={this.handleImportType}
                 >
                   {Object.keys(importDataModule).map(name => {
@@ -484,7 +485,10 @@ class ProjectData extends Component {
                 {this.state.curExportType ? (
                   <div>
                     <p className="export-desc">{exportDataModule[this.state.curExportType].desc}</p>
-                    <a target="_blank" href={exportHref}>
+                    <a 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={exportHref}>
                       <Button className="export-button" type="primary" size="large">
                         {' '}
                         导出{' '}

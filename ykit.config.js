@@ -11,6 +11,7 @@ var assetsPluginInstance = new AssetsPlugin({
 var fs = require('fs');
 var package = require('./package.json');
 var yapi = require('./server/yapi');
+var isWin = require('os').platform() === 'win32'
 
 var compressPlugin = new CompressionPlugin({
   asset: '[path].gz[query]',
@@ -78,7 +79,7 @@ module.exports = {
           defaultQuery.plugins.push(['import', { libraryName: 'antd' }]);
           return defaultQuery;
         },
-        exclude: /node_modules\/(?!_?(yapi-plugin|json-schema-editor-visual))/
+        exclude: isWin ? /(tui-editor|node_modules\\(?!_?(yapi-plugin|json-schema-editor-visual)))/ : /(tui-editor|node_modules\/(?!_?(yapi-plugin|json-schema-editor-visual)))/
       }
     }
   ],
@@ -93,7 +94,6 @@ module.exports = {
             'react',
             'react-dom',
             'redux',
-            'redux-thunk',
             'redux-promise',
             'react-router',
             'react-router-dom',
@@ -102,23 +102,10 @@ module.exports = {
             'react-dnd',
             'reactabular-table',
             'reactabular-dnd',
-            'table-resolver',
-            'recharts'
+            'table-resolver'
           ],
-          lib2: ['brace', 'mockjs', 'json5', 'url', 'axios', 'moment'],
-          lib3: [
-            // 'codemirror',
-            // "highlight.js",
-            // "jquery",
-            // "markdown-it",
-            // "plantuml-encoder",
-            // "squire-rte",
-            // "to-mark",
-            // "tui-chart",
-            // "tui-code-snippet",
-            // "tui-color-picker",
-            'tui-editor'
-          ]
+          lib2: ['brace', 'json5', 'url', 'axios'],
+          lib3: ['mockjs', 'moment', 'recharts']
         }
       },
       modifyWebpackConfig: function(baseConfig) {
@@ -170,6 +157,16 @@ module.exports = {
               '?sourceMap'
           )
         });
+
+        baseConfig.module.loaders.push({
+          test: /.(gif|jpg|jpeg|png|woff|woff2|eot|ttf|svg)$/,
+          loader: 'url-loader',
+          options: {
+            limit: 8192,
+            name: ['[path][name].[ext]?[sha256#base64:8]']
+          }
+        });
+
         baseConfig.module.loaders.push({
           test: /\.(sass|scss)$/,
           loader: ykit.ExtractTextPlugin.extract(
@@ -182,7 +179,7 @@ module.exports = {
 
         baseConfig.module.preLoaders.push({
           test: /\.(js|jsx)$/,
-          exclude: /node_modules|google-diff.js/,
+          exclude: /tui-editor|node_modules|google-diff.js/,
           loader: 'eslint-loader'
         });
 
@@ -201,6 +198,9 @@ module.exports = {
           );
           baseConfig.plugins.push(assetsPluginInstance);
           baseConfig.plugins.push(compressPlugin);
+          baseConfig.plugins.push(
+            new this.webpack.ContextReplacementPlugin(/moment[\\\/]locale$/, /^\.\/(zh-cn|en-gb)$/)
+          );
         }
         return baseConfig;
       }

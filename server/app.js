@@ -7,9 +7,11 @@ yapi.commons = commons;
 const dbModule = require('./utils/db.js');
 yapi.connect = dbModule.connect();
 const mockServer = require('./middleware/mockServer.js');
-const plugins = require('./plugin.js');
+require('./plugin.js');
 const websockify = require('koa-websocket');
 const websocket = require('./websocket.js');
+const storageCreator = require('./utils/storage')
+require('./utils/notice')
 
 const Koa = require('koa');
 const koaStatic = require('koa-static');
@@ -17,6 +19,7 @@ const koaStatic = require('koa-static');
 const koaBody = require('koa-body');
 const router = require('./router.js');
 
+global.storageCreator = storageCreator;
 let indexFile = process.argv[2] === 'dev' ? 'dev.html' : 'index.html';
 
 const app = websockify(new Koa());

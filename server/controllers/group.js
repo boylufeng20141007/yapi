@@ -6,6 +6,7 @@ const userModel = require('../models/user.js');
 const interfaceModel = require('../models/interface.js');
 const interfaceColModel = require('../models/interfaceCol.js');
 const interfaceCaseModel = require('../models/interfaceCase.js');
+const _ = require('underscore')
 
 const rolename = {
   owner: '组长',
@@ -125,11 +126,19 @@ class groupController extends baseController {
   async add(ctx) {
     let params = ctx.params;
 
-    if (this.getRole() !== 'admin') {
-      return (ctx.body = yapi.commons.resReturn(null, 401, '没有权限'));
-    }
+    // 新版每个人都有权限添加分组
+    
+    // if (this.getRole() !== 'admin') {
+    //   return (ctx.body = yapi.commons.resReturn(null, 401, '没有权限'));
+    // }
 
     let owners = [];
+
+    if(params.owner_uids.length === 0){
+      params.owner_uids.push(
+        this.getUid()
+      )
+    }
 
     if (params.owner_uids) {
       for (let i = 0, len = params.owner_uids.length; i < len; i++) {
@@ -201,6 +210,25 @@ class groupController extends baseController {
       username: userData.username,
       email: userData.email
     };
+  }
+
+  async getMyGroup(ctx){
+    var groupInst = yapi.getInst(groupModel);
+    let privateGroup = await groupInst.getByPrivateUid(this.getUid());
+    if (!privateGroup) {
+      privateGroup = await groupInst.save({
+        uid: this.getUid(),
+        group_name: 'User-' + this.getUid(),
+        add_time: yapi.commons.time(),
+        up_time: yapi.commons.time(),
+        type: 'private'
+      });
+    }
+    if(privateGroup){
+      ctx.body = yapi.commons.resReturn(privateGroup)
+    }else{
+      ctx.body = yapi.commons.resReturn(null)
+    }
   }
 
   /**
@@ -373,7 +401,6 @@ class groupController extends baseController {
   async list(ctx) {
     var groupInst = yapi.getInst(groupModel);
     let projectInst = yapi.getInst(projectModel);
-    let result = await groupInst.list();
 
     let privateGroup = await groupInst.getByPrivateUid(this.getUid());
     let newResult = [];
@@ -388,27 +415,40 @@ class groupController extends baseController {
       });
     }
 
-    if (result && result.length > 0) {
-      for (let i = 0; i < result.length; i++) {
-        result[i] = result[i].toObject();
-        result[i].role = await this.getProjectRole(result[i]._id, 'group');
-        if (result[i].role !== 'member') {
-          newResult.unshift(result[i]);
-        } else {
-          let publicCount = await projectInst.countWithPublic(result[i]._id);
-          if (publicCount > 0) {
-            newResult.push(result[i]);
-          } else {
-            let projectCountWithAuth = await projectInst.getProjectWithAuth(
-              result[i]._id,
-              this.getUid()
-            );
-            if (projectCountWithAuth > 0) {
-              newResult.push(result[i]);
-            }
-          }
+    if(this.getRole() === 'admin'){
+      let result = await groupInst.list();
+      if(result && result.length > 0 ){
+        for (let i = 0; i < result.length; i++){
+          result[i] = result[i].toObject();
+          newResult.unshift(result[i])
         }
       }
+    }else{
+      let result = await groupInst.getAuthList(this.getUid());
+      if(result && result.length > 0 ){
+        for (let i = 0; i < result.length; i++){
+          result[i] = result[i].toObject();
+          newResult.unshift(result[i])
+        }
+      }
+
+      const groupIds = newResult.map(item=> item._id);
+      const newGroupIds = [];
+
+      let groupByProject = await projectInst.getAuthList(this.getUid());
+      if(groupByProject && groupByProject.length > 0){
+        groupByProject.forEach( _data=>{
+          const _temp = [...groupIds, ...newGroupIds];
+          if(!_.find(_temp, id=> id === _data.group_id)){
+            newGroupIds.push(_data.group_id)
+          }
+        })
+      }
+      let newData = await groupInst.findByGroups(newGroupIds)
+      newData.forEach(_data=>{
+        _data = _data.toObject();
+        newResult.push(_data);
+      })
     }
     if (privateGroup) {
       privateGroup = privateGroup.toObject();

@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { Row, Col, Button, Icon, Card } from 'antd';
 import PropTypes from 'prop-types';
 import { withRouter } from 'react-router';
-import { getImgPath } from '../../common.js';
 import LogoSVG from '../../components/LogoSVG/index.js';
 import { changeMenuItem } from '../../reducer/modules/menu';
 const plugin = require('client/plugin.js');
@@ -30,7 +29,7 @@ const HomeGuest = () => (
               <a
                 target="_blank"
                 rel="noopener noreferrer"
-                href="https://yapi.ymfe.org"
+                href="https://hellosean1025.github.io/yapi"
                 className="item"
               >
                 使用文档
@@ -61,7 +60,7 @@ const HomeGuest = () => (
           </Col>
           <Col lg={15} xs={0} className="col-img">
             <div className="img-container">
-              <img className="img" src={getImgPath('/image/demo-img', 'jpg')} />
+              
             </div>
           </Col>
         </Row>
@@ -372,7 +371,7 @@ class Home extends Component {
                   </Button>
                 </Link>
                 <Button className="btn-home btn-home-normal">
-                  <a target="_blank" rel="noopener noreferrer" href="https://yapi.ymfe.org">
+                  <a target="_blank" rel="noopener noreferrer" href="https://hellosean1025.github.io/yapi">
                     使用文档
                   </a>
                 </Button>

@@ -80,7 +80,7 @@ v1.3.21 新增全局变量，用户可以在环境列表中定义全局变量的
 
 ## 请求配置
 
-通过自定义 js 脚本方式改变请求的参数和返回的 response 数据
+pre-script, 通过自定义 js 脚本方式改变请求的参数和返回的 response 数据
 
 ### 请求参数示例
 
@@ -159,6 +159,17 @@ context.responseData.a = 2;
 > （v1.3.16+新增）context.href 和 context.hostname  
 > （v1.3.17+新增）context.caseId 测试用例的唯一 key 值
 
+
+### storage
+
+storage.setItem 兼容浏览器和服务端，并且是持久化数据存储，不会丢失，用法类似于 localStorage。
+storage 一共两个 api，分别是 setItem 和 getItem
+
+```js
+storage.setItem('xxx', 'token-----xxxxx')
+context.query.token = storage.getItem('xxx')
+```
+
 ### 工具函数
 
 ```
@@ -222,33 +233,16 @@ context.promise = new Promise(function(resolve) {
 
 > 处理完成后，不要忘记 `resolve()`，不然会一直处于挂起状态
 
-## token 配置
+## token
 
-每个项目都有唯一的标识 token，用户可以使用这个 token 值来请求项目的所有资源数据。目前用到的地方是接口的<a  href="./case.md">自动化测试</a>，用户不需要登录就可以访问接口测试结果信息。
+每个项目都有唯一的标识 token，用户可以使用这个 token 值来请求 openapi。
+
+[openapi 文档地址](https://hellosean1025.github.io/yapi/openapi.html)
+
 
 ## 全局mock
 
 v1.3.21 新增全局 mock 设置，方便用户在项目层面上全局设置公共的mock数据，具体 mock 脚本详细使用方法详见 <a href="./adv_mock.md#自定义-mock-脚本">自定义 Mock 脚本</a> 
-
-可以针对项目自定义 Mock 占位符，具体使用方法如下：
-
-```
-Random.extend({
-    constellation: function(date) {
-        var constellations = ['白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座', '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座']
-        return this.pick(constellations)
-    }
-})
-
-```
-在接口编辑中使用
-
-```
-{
-  "data": "@CONSTELLATION"   // => "水瓶座"
-}
-```
-
 
 ### Mock 优先级说明
 

@@ -14,10 +14,12 @@ const _ = require('underscore');
 const Ajv = require('ajv');
 const Mock = require('mockjs');
 
+
+
 const ejs = require('easy-json-schema');
 
 const jsf = require('json-schema-faker');
-const formats = require('../../common/formats');
+const { schemaValidator } = require('../../common/utils');
 const http = require('http');
 
 jsf.extend ('mock', function () {
@@ -417,8 +419,9 @@ exports.createAction = (router, baseurl, routerController, action, path, method,
     let inst = new routerController(ctx);
     try {
       await inst.init(ctx);
+      ctx.params = Object.assign({}, ctx.request.query, ctx.request.body, ctx.params);
       if (inst.schemaMap && typeof inst.schemaMap === 'object' && inst.schemaMap[action]) {
-        ctx.params = Object.assign({}, ctx.request.query, ctx.request.body, ctx.params);
+        
         let validResult = yapi.commons.validateParams(inst.schemaMap[action], ctx.params);
 
         if (!validResult.valid) {
@@ -509,18 +512,19 @@ function convertString(variable) {
     return variable.name + ': ' + variable.message;
   }
   try {
+    if(variable && typeof variable === 'string'){
+      return variable;
+    }
     return JSON.stringify(variable, null, '   ');
   } catch (err) {
     return variable || '';
   }
 }
 
-exports.runCaseScript = async function runCaseScript(params) {
-  let script = params.script;
-  // script 是断言
-  if (!script) {
-    return yapi.commons.resReturn('ok');
-  }
+
+exports.runCaseScript = async function runCaseScript(params, colId, interfaceId) {
+  const colInst = yapi.getInst(interfaceColModel);
+  let colData = await colInst.get(colId);
   const logs = [];
   const context = {
     assert: require('assert'),
@@ -536,14 +540,56 @@ exports.runCaseScript = async function runCaseScript(params) {
 
   let result = {};
   try {
-    result = yapi.commons.sandbox(context, script);
 
+    if(colData.checkHttpCodeIs200){
+      let status = +params.response.status;
+      if(status !== 200){
+        throw ('Http status code 不是 200，请检查(该规则来源于于 [测试集->通用规则配置] )')
+      }
+    }
+  
+    if(colData.checkResponseField.enable){
+      if(params.response.body[colData.checkResponseField.name] != colData.checkResponseField.value){
+        throw (`返回json ${colData.checkResponseField.name} 值不是${colData.checkResponseField.value}，请检查(该规则来源于于 [测试集->通用规则配置] )`)
+      }
+    }
+
+    if(colData.checkResponseSchema){
+      const interfaceInst = yapi.getInst(interfaceModel);
+      let interfaceData = await interfaceInst.get(interfaceId);
+      if(interfaceData.res_body_is_json_schema && interfaceData.res_body){
+        let schema = JSON.parse(interfaceData.res_body);
+        let result = schemaValidator(schema, context.body)
+        if(!result.valid){
+          throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}
+数据结构如下：
+${JSON.stringify(schema,null,2)}`)
+        }
+      }
+    }
+
+    if(colData.checkScript.enable){
+      let globalScript = colData.checkScript.content;
+      // script 是断言
+      if (globalScript) {
+        logs.push('执行脚本：' + globalScript)
+        result = yapi.commons.sandbox(context, globalScript);
+      }
+    }
+
+
+    let script = params.script;
+    // script 是断言
+    if (script) {
+      logs.push('执行脚本:' + script)
+      result = yapi.commons.sandbox(context, script);
+    }
     result.logs = logs;
     return yapi.commons.resReturn(result);
   } catch (err) {
     logs.push(convertString(err));
     result.logs = logs;
-
+    logs.push(err.name + ': ' + err.message)
     return yapi.commons.resReturn(result, 400, err.name + ': ' + err.message);
   }
 };
@@ -562,41 +608,6 @@ exports.getUserdata = async function getUserdata(uid, role) {
     email: userData.email
   };
 };
-// 邮件发送
-exports.sendNotice = async function(projectId, data) {
-  const followInst = yapi.getInst(followModel);
-  const userInst = yapi.getInst(userModel);
-  const projectInst = yapi.getInst(projectModel);
-  const list = await followInst.listByProjectId(projectId);
-  const starUsers = list.map(item => item.uid);
-
-  const projectList = await projectInst.get(projectId);
-  const projectMenbers = projectList.members
-    .filter(item => item.email_notice)
-    .map(item => item.uid);
-
-  const users = arrUnique(projectMenbers, starUsers);
-  const usersInfo = await userInst.findByUids(users);
-  const emails = usersInfo.map(item => item.email).join(',');
-
-  try {
-    yapi.commons.sendMail({
-      to: emails,
-      contents: data.content,
-      subject: data.title
-    });
-  } catch (e) {
-    yapi.commons.log('邮件发送失败：' + e, 'error');
-  }
-};
-
-function arrUnique(arr1, arr2) {
-  let arr = arr1.concat(arr2);
-  let res = arr.filter(function(item, index, arr) {
-    return arr.indexOf(item) === index;
-  });
-  return res;
-}
 
 // 处理mockJs脚本
 exports.handleMockScript = function(script, context) {
@@ -657,7 +668,7 @@ exports.createWebAPIRequest = function(ops) {
       }
     );
     http_client.on('error', (e) => {
-      reject({message: 'request error'});
+      reject({message: `request error: ${e.message}`});
     });
     http_client.end();
   });

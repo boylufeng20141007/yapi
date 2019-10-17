@@ -28,7 +28,7 @@ yapi server
 ```bash
 mkdir yapi
 cd yapi
-git clone https://github.com/YMFE/yapi.git vendors //或者下载 zip 包解压到 vendors 目录
+git clone https://github.com/YMFE/yapi.git vendors //或者下载 zip 包解压到 vendors 目录（clone 整个仓库大概 140+ M，可以通过 `git clone --depth=1 https://github.com/YMFE/yapi.git vendors` 命令减少，大概 10+ M）
 cp vendors/config_example.json ./config.json //复制完成后请修改相关配置
 cd vendors
 npm install --production --registry https://registry.npm.taobao.org
@@ -112,7 +112,7 @@ node server/app.js //启动服务器后，请访问 127.0.0.1:{config.json配置
   "mail": {...},
   "ldapLogin": {
       "enable": true,
-      "server": "ldap://l-ldapt1.ops.dev.cn0.qunar.com",
+      "server": "ldap://l-ldapt1.com",
       "baseDn": "CN=Admin,CN=Users,DC=test,DC=com",
       "bindPassword": "password123",
       "searchDn": "OU=UserContainer,DC=test,DC=com",
@@ -137,7 +137,7 @@ node server/app.js //启动服务器后，请访问 127.0.0.1:{config.json配置
 - `usernameKey`: ldap数据库存放用户名信息的字段（v1.3.21 新增 非必须）
 
 
-重启服务器后，可以在登录页看到如下画面，说明 ladp 配置成功
+重启服务器后，可以在登录页看到如下画面，说明 ldap 配置成功
 
 <img src="./ldap.png" />
 
@@ -164,3 +164,23 @@ node server/app.js //启动服务器后，请访问 127.0.0.1:{config.json配置
 }
 
 ```
+
+
+### 如何配置mongodb集群
+
+请升级到 yapi >= **1.4.0**以上版本，然后在 config.json db项，配置 connectString:
+
+```json
+
+{
+  "port": "***",
+  "db": {
+    "connectString": "mongodb://127.0.0.100:8418,127.0.0.101:8418,127.0.0.102:8418/yapidb?slaveOk=true",
+    "user": "******",
+    "pass": "******"
+  },
+}
+
+```
+
+详细配置参考： [wiki](https://mongoosejs.com/docs/connections.html#multiple_connections)

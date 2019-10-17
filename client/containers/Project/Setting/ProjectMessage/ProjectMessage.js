@@ -437,7 +437,7 @@ class ProjectMessage extends Component {
                 initialValue: initFormValues.is_json5
               })(<Switch checkedChildren="开" unCheckedChildren="关" />)}
             </FormItem>
-            <FormItem {...formItemLayout} label="默认开启邮件通知">
+            <FormItem {...formItemLayout} label="默认开启消息通知">
               {getFieldDecorator('switch_notice', {
                 valuePropName: 'checked',
                 initialValue: initFormValues.switch_notice
@@ -459,10 +459,11 @@ class ProjectMessage extends Component {
                     <span className="radio-desc">只有组长和项目开发者可以索引并查看项目信息</span>
                   </Radio>
                   <br />
-                  <Radio value="public" className="radio">
+                  {projectMsg.role === 'admin' && <Radio value="public" className="radio">
                     <Icon type="unlock" />公开<br />
                     <span className="radio-desc">任何人都可以索引并查看项目信息</span>
-                  </Radio>
+                  </Radio>}
+                  
                 </RadioGroup>
               )}
             </FormItem>

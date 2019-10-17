@@ -5,6 +5,7 @@ const mockExtra = require('../../common/mock-extra.js');
 const { schemaValidator } = require('../../common/utils.js');
 const _ = require('underscore');
 const Mock = require('mockjs');
+const variable = require('../../client/constants/variable.js')
 /**
  *
  * @param {*} apiPath /user/tom
@@ -13,7 +14,10 @@ const Mock = require('mockjs');
 function matchApi(apiPath, apiRule) {
   let apiRules = apiRule.split('/');
   let apiPaths = apiPath.split('/');
-  let pathRules = {};
+  let pathParams = {
+    __weight: 0
+  };
+
   if (apiPaths.length !== apiRules.length) {
     return false;
   }
@@ -28,9 +32,9 @@ function matchApi(apiPath, apiRule) {
       apiRules[i][0] === '{' &&
       apiRules[i][apiRules[i].length - 1] === '}'
     ) {
-      pathRules[apiRules[i].substr(1, apiRules[i].length - 2)] = apiPaths[i];
+      pathParams[apiRules[i].substr(1, apiRules[i].length - 2)] = apiPaths[i];
     } else if (apiRules[i].indexOf(':') === 0) {
-      pathRules[apiRules[i].substr(1)] = apiPaths[i];
+      pathParams[apiRules[i].substr(1)] = apiPaths[i];
     } else if (
       apiRules[i].length > 2 &&
       apiRules[i].indexOf('{') > -1 &&
@@ -39,7 +43,7 @@ function matchApi(apiPath, apiRule) {
       let params = [];
       apiRules[i] = apiRules[i].replace(/\{(.+?)\}/g, function(src, match) {
         params.push(match);
-        return '(.+)';
+        return '([^\\/\\s]+)';
       });
       apiRules[i] = new RegExp(apiRules[i]);
       if (!apiRules[i].test(apiPaths[i])) {
@@ -49,15 +53,17 @@ function matchApi(apiPath, apiRule) {
       let matchs = apiPaths[i].match(apiRules[i]);
 
       params.forEach((item, index) => {
-        pathRules[item] = matchs[index + 1];
+        pathParams[item] = matchs[index + 1];
       });
     } else {
       if (apiRules[i] !== apiPaths[i]) {
         return false;
+      }else{
+        pathParams.__weight++;
       }
     }
   }
-  return pathRules;
+  return pathParams;
 }
 
 function parseCookie(str) {
@@ -87,6 +93,7 @@ function mockValidator(interfaceData, ctx) {
     l,
     len,
     noRequiredArr = [];
+  let method = interfaceData.method.toUpperCase() || 'GET';
   // query 判断
   for (i = 0, l = interfaceData.req_query.length; i < l; i++) {
     let curQuery = interfaceData.req_query[i];
@@ -97,7 +104,7 @@ function mockValidator(interfaceData, ctx) {
     }
   }
   // form 表单判断
-  if (interfaceData.req_body_type === 'form') {
+  if (variable.HTTP_METHOD[method].request_body && interfaceData.req_body_type === 'form') {
     for (j = 0, len = interfaceData.req_body_form.length; j < len; j++) {
       let curForm = interfaceData.req_body_form[j];
       if (curForm && typeof curForm === 'object' && curForm.required === '1') {
@@ -115,7 +122,7 @@ function mockValidator(interfaceData, ctx) {
   }
   let validResult;
   // json schema 判断
-  if (interfaceData.req_body_type === 'json' && interfaceData.req_body_is_json_schema === true) {
+  if (variable.HTTP_METHOD[method].request_body  && interfaceData.req_body_type === 'json' && interfaceData.req_body_is_json_schema === true) {
     const schema = yapi.commons.json_parse(interfaceData.req_body_other);
     const params = yapi.commons.json_parse(ctx.request.body);
     validResult = schemaValidator(schema, params);
@@ -178,19 +185,19 @@ module.exports = async (ctx, next) => {
   try {
     newpath = path.substr(project.basepath.length);
     interfaceData = await interfaceInst.getByPath(project._id, newpath, ctx.method);
-
+    let queryPathInterfaceData = await interfaceInst.getByQueryPath(project._id, newpath, ctx.method);
     //处理query_path情况  url 中有 ?params=xxx
-    if (!interfaceData || interfaceData.length === 0) {
-      interfaceData = await interfaceInst.getByQueryPath(project._id, newpath, ctx.method);
+    if (!interfaceData || interfaceData.length != queryPathInterfaceData.length) {
+
       let i,
         l,
         j,
         len,
         curQuery,
         match = false;
-      for (i = 0, l = interfaceData.length; i < l; i++) {
+      for (i = 0, l = queryPathInterfaceData.length; i < l; i++) {
         match = false;
-        let currentInterfaceData = interfaceData[i];
+        let currentInterfaceData = queryPathInterfaceData[i];
         curQuery = currentInterfaceData.query_path;
         if (!curQuery || typeof curQuery !== 'object' || !curQuery.path) {
           continue;
@@ -208,18 +215,26 @@ module.exports = async (ctx, next) => {
           interfaceData = [currentInterfaceData];
           break;
         }
-        if (i === l - 1) {
-          interfaceData = [];
-        }
+        // if (i === l - 1) {
+        //   interfaceData = [];
+        // }
+
       }
     }
 
     //处理动态路由
     if (!interfaceData || interfaceData.length === 0) {
       let newData = await interfaceInst.getVar(project._id, ctx.method);
-      let findInterface = _.find(newData, item => {
+
+      let findInterface;
+      let weight = 0;
+      _.each(newData, item => {
         let m = matchApi(newpath, item.path);
         if (m !== false) {
+          if(m.__weight >= weight){
+            findInterface = item;
+          }
+          delete m.__weight;
           ctx.request.query = Object.assign(m, ctx.request.query);
           return true;
         }

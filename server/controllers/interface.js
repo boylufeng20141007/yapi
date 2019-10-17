@@ -19,6 +19,49 @@ const path = require('path');
 // const annotatedCss = require("jsondiffpatch/public/formatters-styles/annotated.css");
 // const htmlCss = require("jsondiffpatch/public/formatters-styles/html.css");
 
+
+function handleHeaders(values){
+  let isfile = false,
+  isHavaContentType = false;
+  if (values.req_body_type === 'form') {
+    values.req_body_form.forEach(item => {
+      if (item.type === 'file') {
+        isfile = true;
+      }
+    });
+
+    values.req_headers.map(item => {
+      if (item.name === 'Content-Type') {
+        item.value = isfile ? 'multipart/form-data' : 'application/x-www-form-urlencoded';
+        isHavaContentType = true;
+      }
+    });
+    if (isHavaContentType === false) {
+      values.req_headers.unshift({
+        name: 'Content-Type',
+        value: isfile ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
+      });
+    }
+  } else if (values.req_body_type === 'json') {
+    values.req_headers
+      ? values.req_headers.map(item => {
+          if (item.name === 'Content-Type') {
+            item.value = 'application/json';
+            isHavaContentType = true;
+          }
+        })
+      : [];
+    if (isHavaContentType === false) {
+      values.req_headers = values.req_headers || [];
+      values.req_headers.unshift({
+        name: 'Content-Type',
+        value: 'application/json'
+      });
+    }
+  }
+}
+
+
 class interfaceController extends baseController {
   constructor(ctx) {
     super(ctx);
@@ -82,7 +125,8 @@ class interfaceController extends baseController {
       api_opened: 'boolean',
       req_body_is_json_schema: 'string',
       res_body_is_json_schema: 'string',
-      markdown: 'string'
+      markdown: 'string',
+      tag: 'array'
     };
 
     this.schemaMap = {
@@ -105,8 +149,7 @@ class interfaceController extends baseController {
           method: minLengthStringField,
           catid: 'number',
           switch_notice: 'boolean',
-          message: minLengthStringField,
-          tag: 'array'
+          message: minLengthStringField
         },
         addAndUpCommonField
       ),
@@ -183,6 +226,8 @@ class interfaceController extends baseController {
       ));
     }
 
+    handleHeaders(params)
+
     params.query_path = {};
     params.query_path.path = http_path.pathname;
     params.query_path.params = [];
@@ -193,13 +238,13 @@ class interfaceController extends baseController {
       });
     });
 
-    let checkRepeat = await this.Model.checkRepeat(params.project_id, http_path.pathname, params.method);
+    let checkRepeat = await this.Model.checkRepeat(params.project_id, params.path, params.method);
 
     if (checkRepeat > 0) {
       return (ctx.body = yapi.commons.resReturn(
         null,
         40022,
-        '已存在的接口:' + http_path.pathname + '[' + params.method + ']'
+        '已存在的接口:' + params.path + '[' + params.method + ']'
       ));
     }
 
@@ -284,7 +329,7 @@ class interfaceController extends baseController {
 
   async save(ctx) {
     let params = ctx.params;
-    
+
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
       if (!auth) {
@@ -353,13 +398,19 @@ class interfaceController extends baseController {
    * @example ./api/interface/get.json
    */
   async get(ctx) {
-    let params = ctx.request.query;
+    let params = ctx.params;
     if (!params.id) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '接口id不能为空'));
     }
 
     try {
       let result = await this.Model.get(params.id);
+      if(this.$tokenAuth){
+        if(params.project_id !== result.project_id){
+          ctx.body = yapi.commons.resReturn(null, 400, 'token有误')
+          return;
+        }
+      }
       // console.log('result', result);
       if (!result) {
         return (ctx.body = yapi.commons.resReturn(null, 490, '不存在的'));
@@ -395,9 +446,11 @@ class interfaceController extends baseController {
    * @example ./api/interface/list.json
    */
   async list(ctx) {
-    let project_id = ctx.request.query.project_id;
+    let project_id = ctx.params.project_id;
     let page = ctx.request.query.page || 1,
       limit = ctx.request.query.limit || 10;
+    let status = ctx.request.query.status,
+      tag = ctx.request.query.tag;
     let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
       return (ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目'));
@@ -412,14 +465,31 @@ class interfaceController extends baseController {
     }
 
     try {
-      let result;
+      let result, count;
       if (limit === 'all') {
         result = await this.Model.list(project_id);
+        count = await this.Model.listCount({project_id});
       } else {
-        result = await this.Model.listWithPage(project_id, page, limit);
+        let option = {project_id};
+        if (status) {
+          if (Array.isArray(status)) {
+            option.status = {"$in": status};
+          } else {
+            option.status = status;
+          }
+        }
+        if (tag) {
+          if (Array.isArray(tag)) {
+            option.tag = {"$in": tag};
+          } else {
+            option.tag = tag;
+          }
+        }
+
+        result = await this.Model.listByOptionWithPage(option, page, limit);
+        count = await this.Model.listCount(option);
       }
 
-      let count = await this.Model.listCount({ project_id });
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -446,6 +516,8 @@ class interfaceController extends baseController {
     let catid = ctx.request.query.catid;
     let page = ctx.request.query.page || 1,
       limit = ctx.request.query.limit || 10;
+    let status = ctx.request.query.status,
+      tag = ctx.request.query.tag;
 
     if (!catid) {
       return (ctx.body = yapi.commons.resReturn(null, 400, 'catid不能为空'));
@@ -460,9 +532,26 @@ class interfaceController extends baseController {
         }
       }
 
-      let result = await this.Model.listByCatidWithPage(catid, page, limit);
 
-      let count = await this.Model.listCount({ catid });
+      let option = {catid}
+      if (status) {
+        if (Array.isArray(status)) {
+          option.status = {"$in": status};
+        } else {
+          option.status = status;
+        }
+      }
+      if (tag) {
+        if (Array.isArray(tag)) {
+          option.tag = {"$in": tag};
+        } else {
+          option.tag = tag;
+        }
+      }
+
+      let result = await this.Model.listByOptionWithPage(option, page, limit);
+
+      let count = await this.Model.listCount(option);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -475,7 +564,7 @@ class interfaceController extends baseController {
   }
 
   async listByMenu(ctx) {
-    let project_id = ctx.request.query.project_id;
+    let project_id = ctx.params.project_id;
     if (!project_id) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
     }
@@ -550,6 +639,8 @@ class interfaceController extends baseController {
     // params.res_body_is_json_schema = _.isUndefined (params.res_body_is_json_schema) ? true : params.res_body_is_json_schema;
     // params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ?  true : params.req_body_is_json_schema;
 
+    handleHeaders(params)
+
     let interfaceData = await this.Model.get(id);
     if (!interfaceData) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '不存在的接口'));
@@ -567,8 +658,9 @@ class interfaceController extends baseController {
       },
       params
     );
-    let http_path;
+
     if (params.path) {
+      let http_path;
       http_path = url.parse(params.path, true);
 
       if (!yapi.commons.verifyPath(http_path.pathname)) {
@@ -596,14 +688,14 @@ class interfaceController extends baseController {
     ) {
       let checkRepeat = await this.Model.checkRepeat(
         interfaceData.project_id,
-        http_path.pathname,
+        params.path,
         params.method
       );
       if (checkRepeat > 0) {
         return (ctx.body = yapi.commons.resReturn(
           null,
           401,
-          '已存在的接口:' + http_path.pathname + '[' + params.method + ']'
+          '已存在的接口:' + params.path + '[' + params.method + ']'
         ));
       }
     }
@@ -627,6 +719,10 @@ class interfaceController extends baseController {
     };
 
     this.catModel.get(interfaceData.catid).then(cate => {
+      let diffView2 = showDiffMsg(jsondiffpatch, formattersHtml, logData);
+      if (diffView2.length <= 0) {
+          return; // 没有变化时，不写日志
+      }
       yapi.commons.saveLog({
         content: `<a href="/user/profile/${this.getUid()}">${username}</a> 
                     更新了分类 <a href="/project/${cate.project_id}/interface/api/cat_${
@@ -659,10 +755,11 @@ class interfaceController extends baseController {
       );
 
       let project = await this.projectModel.getBaseInfo(interfaceData.project_id);
-      
-      let interfaceUrl = `http://${ctx.request.host}/project/${
+
+      let interfaceUrl = `${ctx.request.origin}/project/${
         interfaceData.project_id
       }/interface/api/${id}`;
+
       yapi.commons.sendNotice(interfaceData.project_id, {
         title: `${username} 更新了接口`,
         content: `<html>
@@ -927,7 +1024,7 @@ class interfaceController extends baseController {
    */
 
   async getCatMenu(ctx) {
-    let project_id = ctx.request.query.project_id;
+    let project_id = ctx.params.project_id;
 
     if (!project_id || isNaN(project_id)) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));

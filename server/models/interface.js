@@ -156,15 +156,15 @@ class interfaceModel extends baseModel {
   }
 
   checkRepeat(id, path, method) {
-    return this.model.count({
+    return this.model.countDocuments({
       project_id: id,
-      'query_path.path': path,
+      path: path,
       method: method
     });
   }
 
   countByProjectId(id) {
-    return this.model.count({
+    return this.model.countDocuments({
       project_id: id
     });
   }
@@ -208,7 +208,7 @@ class interfaceModel extends baseModel {
 
   //获取全部接口信息
   getInterfaceListCount() {
-    return this.model.count({});
+    return this.model.countDocuments({});
   }
 
   listByCatid(catid, select) {
@@ -231,6 +231,20 @@ class interfaceModel extends baseModel {
         catid: catid
       })
       .sort({ index: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select(
+        '_id title uid path method project_id catid edit_uid api_opened status add_time up_time, index, tag'
+      )
+      .exec();
+  }
+
+  listByOptionWithPage(option, page, limit) {
+    page = parseInt(page);
+    limit = parseInt(limit);
+    return this.model
+      .find(option)
+      .sort({index: 1})
       .skip((page - 1) * limit)
       .limit(limit)
       .select(
@@ -309,7 +323,7 @@ class interfaceModel extends baseModel {
   }
 
   listCount(option) {
-    return this.model.count(option);
+    return this.model.countDocuments(option);
   }
 
   upIndex(id, index) {
@@ -326,7 +340,10 @@ class interfaceModel extends baseModel {
   search(keyword) {
     return this.model
       .find({
-        title: new RegExp(keyword, 'ig')
+        $or: [
+          { 'title': new RegExp(keyword, 'ig') },
+          { 'path': new RegExp(keyword, 'ig') }
+        ]
       })
       .limit(10);
   }

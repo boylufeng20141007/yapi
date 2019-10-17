@@ -1,3 +1,117 @@
+## v1.8.4
+* 修复 swagger 导入数据时，如果数据格式中缺少 in 的参数，会丢失请求参数
+* 修复当传入数据格式的 method 不规范时，容易导致获取对象为空，出现异常导致动态页面无法打开
+* 修复解决 json-schema-faker/json-schema-faker#453 问题
+
+## v1.8.3
+* 修复管理员无法看到所有分组的 bug
+
+## v1.8.2
+* 重构分组列表功能实现，大幅度优化首屏加载速度
+* 接口运行界面设置 header、query、form 的初始值为其示例值
+* 运行接口请求时支持自动预览HTML
+
+### v1.8.1
+* 优化插件【Swagger 自动同步】在添加地址时的服务端校验行为
+* 优化单个测试用例执行超时时间限制,从3秒改为10秒
+
+### v1.8.0
+* filtering interface on the server instead of client
+
+### v1.7.2
+* 支持接口路径模糊搜索，不包含 basepath
+
+### v1.7.1
+* 废弃 yapi.ymfe.org 文档站点
+
+### v1.7.0
+* fix：修复md两个undefined以及run_auto_test中执行用例id问题 #1024
+
+### v1.7.0-beta.1
+* 修复storage保存逻辑错误
+
+### v1.7.0-beta.0
+* **[插件]** 新增默认插件，支持通过 token 导出包含 basepath 的 json 格式接口，并整合添加 sm2tsservice 入口
+* **[插件]** 新增默认插件，支持swagger数据同步
+* 修复不兼容 node7.6 bug
+
+### v1.5.14 
+* 修复接口运行部分请求参数默认使用示例填写值导致无法删除参数bug
+* 修复无法保存 global bug
+
+### v1.5.13 （存在bug）
+* 支持 pre-script 脚本持久化数据存储，storage 兼容浏览器和服务端，并且是持久化数据存储，不会丢失，用法类似于 localStorage
+* 修复了swagger 数据导入bug
+* 修复接口运行部分请求参数默认使用示例填写值导致无法删除参数bug
+
+### v1.5.12  （存在bug）
+* 废弃 v1.6.x 新增功能，因为有不可控的bug出现
+* 支持项目设置 hook
+* 开放api 新增 '/api/plugin/export'
+* 接口运行部分请求参数默认使用示例填写值
+
+### v1.5.10
+* 解决 license should be a valid SPDX license expression 报错
+* 修改OpenAPI比较版本方法
+* fix复制路径不包含基本路径
+* 修复了第一次部署，首页一直处于 loading bug
+
+### v1.5.7
+* 数据导入默认使用完全覆盖
+* 升级新版本 cross-request 扩展，因 chrome 安全策略限制，不再支持文件上传
+* fix 重复的 moment 依赖，导致安装时报错
+* feat: add jsrsasign Lib
+
+### v1.5.6
+* 修复 /api/open/import_data 参数bug
+* 修复  /api/open/import_data 文档错误，merge 参数误写为 dataSync
+
+### v1.5.5
+* cross-request 升级到 2.10
+* /api/open/import_data 新增 url 参数，支持服务端 url 导入
+
+### v1.5.2
+* 新增 openapi `/api/project/get`，可获取项目基本信息
+
+### v1.5.1
+
+* 优化 restful api 动态路由权重匹配算法，匹配更加精确
+* openapi 新增 `/api/interface/list_cat`，获取某个分类下所有接口
+* 新增了 rap数据导入到 yapi 插件 [rap2yapi](https://github.com/wxxcarl/yapi-plugin-import-rap)
+
+### v1.5.0
+
+* 优化开放 api功能，现在 token 带有用户信息了
+* 修复无法获取请求302 跳转前的 headers
+
+### v1.4.4
+* 优化了 json-schema 编辑器交互，修复了参数名写到一半提示重复的问题
+* 优化了首页体验，提升页面打开速度
+* 新增自动化测试通用规则配置功能
+
+### v1.4.3
+* 修复了可视化安装，mongodb 报错的问题
+* 支持了 swagger 导出功能
+* 支持了克隆测试用例
+
+### v1.4.2
+* 优化数据导入对 headers 处理，如果 requestType 是 json，自动增加header "content-type/json"
+* fix: 修改了测试集合有多个项目接口时，切换执行环境相互覆盖不生效的问题 #692
+* fix: mongoose warning 'Error: (node:3819) DeprecationWarning: collection.ensureIndex is deprecated. Use createIndexes instead'
+* opti: 去掉没必要的redux-thunk
+* 接口更新没有变化时，不记录日志，避免cron多次导入swagger的接口时，导致动态里展示一大堆的无意义日志
+
+### v1.4.1
+
+* 支持任何人都可以添加分组，只有管理员才能修改项目是否公开
+* 支持 mongodb 集群
+
+#### Bug Fixed
+* 修改 mock严格模式，GET带有 JSON BODY 导致的验证问题
+* 对 queryPath 改动导致的bug，支持通过 xxx?controller=name 等 query 参数区分路径
+* 因 tui-editor 需要安装github 依赖，导致部分机器无法部署成功的问题
+
+
 ### v1.3.23
 
 * 接口tag功能
@@ -476,3 +590,7 @@
 
 * 接口备注集成了富文本编辑
 * 支持 har 协议的接口数据导入
+
+
+todo:
+新增 crypto 加密函数

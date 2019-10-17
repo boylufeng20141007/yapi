@@ -1,6 +1,6 @@
 const _ = require('underscore')
 const swagger = require('swagger-client');
-
+const compareVersions = require('compare-versions');
 
   var SwaggerData, isOAS3;
   function handlePath(path) {
@@ -72,7 +72,7 @@ const swagger = require('swagger-client');
         }
       }
 
-      isOAS3 = res.openapi && res.openapi === '3.0.0';
+      isOAS3 = res.openapi && compareVersions(res.openapi,'3.0.0') >= 0;
       if (isOAS3) {
         res = openapi2swagger(res);
       }
@@ -190,6 +190,7 @@ const swagger = require('swagger-client');
           required: param.required ? '1' : '0'
         };
 
+        if (param.in) {
         switch (param.in) {
           case 'path':
             api.req_params.push(defaultParam);
@@ -208,6 +209,9 @@ const swagger = require('swagger-client');
             api.req_headers.push(defaultParam);
             break;
         }
+      } else {
+        api.req_query.push(defaultParam);
+      }
       });
     }
 
@@ -241,7 +245,7 @@ const swagger = require('swagger-client');
       if (codes.indexOf('200') > -1) {
         curCode = '200';
       } else curCode = codes[0];
-      
+
       let res = api[curCode];
       if (res && typeof res === 'object') {
         if (res.schema) {
